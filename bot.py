@@ -10,7 +10,12 @@ from aiogram.types import FSInputFile
 
 # ================= НАСТРОЙКИ =================
 
-TOKEN = "8510415452:AAHJpmdHY16SjtKhpXJgQtNY8_LKzzTNglY"
+import os
+                    
+TOKEN = os.getenv("TOKEN")
+if not TOKEN:
+    raise ValueError("TOKEN не найден. Укажи его в переменных окружения")
+
 
 FILES_DIR = "files"
 FILE_IDS_PATH = "file_ids.json"
@@ -133,3 +138,4 @@ async def main():
 
 if __name__ == "__main__":
     asyncio.run(main())
+
