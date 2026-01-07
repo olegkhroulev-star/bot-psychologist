@@ -12,9 +12,13 @@ from aiogram.types import FSInputFile
 
 import os
                     
-TOKEN = os.getenv("TOKEN")
+import os
+
+TOKEN = os.getenv("BOT_TOKEN")
+
 if not TOKEN:
-    raise ValueError("TOKEN не найден. Укажи его в переменных окружения")
+    raise RuntimeError("BOT_TOKEN не найден в переменных окружения")
+
 
 
 FILES_DIR = "files"
@@ -138,4 +142,5 @@ async def main():
 
 if __name__ == "__main__":
     asyncio.run(main())
+
 
