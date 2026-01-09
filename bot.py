@@ -15,7 +15,7 @@ logging.basicConfig(
 
 FILES = [
     "files/anxiety.pdf",
-    "files/stress.pdf",
+    "files/growth.pdf",
     "files/burnout.pdf",
     "files/sleep.pdf",
     "files/relations.pdf",
@@ -54,6 +54,7 @@ async def main():
 
 if __name__ == "__main__":
     asyncio.run(main())
+
 
 
 
