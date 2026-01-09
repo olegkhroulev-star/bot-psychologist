@@ -1,56 +1,59 @@
 import asyncio
-import os
 import logging
+import os
+
 from aiogram import Bot, Dispatcher, types
-from aiogram.filters import Command
-from dotenv import load_dotenv
-
-from aiohttp import web
-
-load_dotenv()
+from aiogram.filters import CommandStart
+from aiogram.types import FSInputFile
 
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s | %(levelname)s | %(message)s"
+)
 
-# ===== HTTP СЕРВЕР (ДЛЯ RENDER) =====
-async def handle(request):
-    return web.Response(text="Bot is running")
+FILES = [
+    "files/anxiety.pdf",
+    "files/stress.pdf",
+    "files/burnout.pdf",
+    "files/sleep.pdf",
+    "files/relations.pdf",
+    "files/selfesteem.pdf",
+]
 
-async def start_web_server():
-    app = web.Application()
-    app.router.add_get("/", handle)
+bot = Bot(token=BOT_TOKEN)
+dp = Dispatcher()
 
-    runner = web.AppRunner(app)
-    await runner.setup()
 
-    port = int(os.getenv("PORT", 10000))
-    site = web.TCPSite(runner, "0.0.0.0", port)
-    await site.start()
+@dp.message(CommandStart())
+async def start_handler(message: types.Message):
+    await message.answer("Начинаю отправку файлов 📂")
 
-    logger.info(f"🌐 Web server started on port {port}")
+    for path in FILES:
+        if not os.path.exists(path):
+            logging.error(f"❌ Файл не найден: {path}")
+            await message.answer(f"Файл не найден: {path}")
+            continue
 
-# ===== TELEGRAM BOT =====
-async def start_bot():
-    bot = Bot(token=BOT_TOKEN)
-    dp = Dispatcher()
+        try:
+            logging.info(f"📤 Отправляю файл: {path}")
+            await message.answer_document(FSInputFile(path))
+            await asyncio.sleep(1)  # важно!
+        except Exception as e:
+            logging.exception(f"🔥 Ошибка при отправке {path}: {e}")
+            await message.answer(f"Ошибка при отправке {path}")
 
-    @dp.message(Command("start"))
-    async def start(message: types.Message):
-        await message.answer("🤖 Бот работает!")
+    await message.answer("Готово ✅")
 
-    logger.info("🤖 Bot polling started")
+
+async def main():
+    logging.info("🤖 Bot polling started")
     await dp.start_polling(bot)
 
-# ===== MAIN =====
-async def main():
-    await asyncio.gather(
-        start_web_server(),  # порт для Render
-        start_bot(),         # polling
-    )
 
 if __name__ == "__main__":
     asyncio.run(main())
+
 
 
