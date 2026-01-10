@@ -1,62 +1,115 @@
+import os
 import asyncio
 import logging
-import os
+
+from aiohttp import web
+from dotenv import load_dotenv
 
 from aiogram import Bot, Dispatcher, types
 from aiogram.filters import CommandStart
-from aiohttp import web
+from aiogram.types import (
+    InlineKeyboardMarkup,
+    InlineKeyboardButton,
+    FSInputFile,
+)
+from aiogram.webhook.aiohttp_server import (
+    SimpleRequestHandler,
+    setup_application,
+)
+
+# ------------------ CONFIG ------------------
+
+load_dotenv()
 
 BOT_TOKEN = os.getenv("BOT_TOKEN")
-WEBHOOK_HOST = os.getenv("WEBHOOK_HOST")
+BASE_URL = os.getenv("BASE_URL")
 WEBHOOK_PATH = f"/webhook/{BOT_TOKEN}"
-WEBHOOK_URL = f"{WEBHOOK_HOST}{WEBHOOK_PATH}"
-
+WEBHOOK_URL = BASE_URL + WEBHOOK_PATH
 PORT = int(os.getenv("PORT", 10000))
 
 logging.basicConfig(level=logging.INFO)
 
-bot = Bot(BOT_TOKEN)
+bot = Bot(token=BOT_TOKEN)
 dp = Dispatcher()
 
+# ------------------ FILES ------------------
+
+FILES = {
+    "anxiety": ("Тревожность", "files/anxiety.pdf"),
+    "burnout": ("Выгорание", "files/burnout.pdf"),
+    "growth": ("Личностный рост", "files/growth.pdf"),
+    "relations": ("Отношения", "files/relations.pdf"),
+    "selfesteem": ("Самооценка", "files/selfesteem.pdf"),
+    "sleep": ("Сон", "files/sleep.pdf"),
+}
+
+# ------------------ KEYBOARD ------------------
+
+def files_keyboard() -> InlineKeyboardMarkup:
+    keyboard = []
+
+    for key, (title, _) in FILES.items():
+        keyboard.append(
+            [InlineKeyboardButton(text=title, callback_data=f"file:{key}")]
+        )
+
+    return InlineKeyboardMarkup(inline_keyboard=keyboard)
+
+# ------------------ HANDLERS ------------------
 
 @dp.message(CommandStart())
 async def start(message: types.Message):
-    await message.answer("Бот работает через webhook ✅")
+    await message.answer(
+        "Привет! 👋\n\n"
+        "Выбери тему, и я пришлю тебе материал:",
+        reply_markup=files_keyboard(),
+    )
 
+@dp.callback_query(lambda c: c.data.startswith("file:"))
+async def send_file(callback: types.CallbackQuery):
+    key = callback.data.split(":")[1]
 
-async def on_startup(app):
+    if key not in FILES:
+        await callback.answer("Файл не найден", show_alert=True)
+        return
+
+    title, path = FILES[key]
+
+    try:
+        document = FSInputFile(path)
+        await callback.message.answer_document(
+            document=document,
+            caption=f"📄 {title}"
+        )
+        await callback.answer()
+    except FileNotFoundError:
+        await callback.answer("Файл отсутствует на сервере", show_alert=True)
+
+# ------------------ WEBHOOK APP ------------------
+
+async def on_startup(bot: Bot):
     await bot.set_webhook(WEBHOOK_URL)
     logging.info(f"✅ Webhook set: {WEBHOOK_URL}")
 
-
-async def on_shutdown(app):
+async def on_shutdown(bot: Bot):
     await bot.delete_webhook()
-    logging.info("❌ Webhook removed")
 
-
-async def handle_webhook(request):
-    update = types.Update(**await request.json())
-    await dp.feed_update(bot, update)
-    return web.Response()
-
-
-async def main():
+def main():
     app = web.Application()
-    app.router.add_post(WEBHOOK_PATH, handle_webhook)
 
-    app.on_startup.append(on_startup)
-    app.on_shutdown.append(on_shutdown)
+    dp.startup.register(on_startup)
+    dp.shutdown.register(on_shutdown)
 
-    runner = web.AppRunner(app)
-    await runner.setup()
-    site = web.TCPSite(runner, "0.0.0.0", PORT)
-    await site.start()
+    SimpleRequestHandler(
+        dispatcher=dp,
+        bot=bot,
+    ).register(app, path=WEBHOOK_PATH)
 
-    logging.info(f"🌐 Web server started on port {PORT}")
+    setup_application(app, dp, bot=bot)
 
-    await asyncio.Event().wait()
-
+    web.run_app(app, port=PORT)
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    main()
+
 
