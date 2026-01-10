@@ -4,57 +4,59 @@ import os
 
 from aiogram import Bot, Dispatcher, types
 from aiogram.filters import CommandStart
-from aiogram.types import FSInputFile
+from aiohttp import web
 
 BOT_TOKEN = os.getenv("BOT_TOKEN")
+WEBHOOK_HOST = os.getenv("WEBHOOK_HOST")
+WEBHOOK_PATH = f"/webhook/{BOT_TOKEN}"
+WEBHOOK_URL = f"{WEBHOOK_HOST}{WEBHOOK_PATH}"
 
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s | %(levelname)s | %(message)s"
-)
+PORT = int(os.getenv("PORT", 10000))
 
-FILES = [
-    "files/anxiety.pdf",
-    "files/growth.pdf",
-    "files/burnout.pdf",
-    "files/sleep.pdf",
-    "files/relations.pdf",
-    "files/selfesteem.pdf",
-]
+logging.basicConfig(level=logging.INFO)
 
-bot = Bot(token=BOT_TOKEN)
+bot = Bot(BOT_TOKEN)
 dp = Dispatcher()
 
 
 @dp.message(CommandStart())
-async def start_handler(message: types.Message):
-    await message.answer("Начинаю отправку файлов 📂")
+async def start(message: types.Message):
+    await message.answer("Бот работает через webhook ✅")
 
-    for path in FILES:
-        if not os.path.exists(path):
-            logging.error(f"❌ Файл не найден: {path}")
-            await message.answer(f"Файл не найден: {path}")
-            continue
 
-        try:
-            logging.info(f"📤 Отправляю файл: {path}")
-            await message.answer_document(FSInputFile(path))
-            await asyncio.sleep(1)  # важно!
-        except Exception as e:
-            logging.exception(f"🔥 Ошибка при отправке {path}: {e}")
-            await message.answer(f"Ошибка при отправке {path}")
+async def on_startup(app):
+    await bot.set_webhook(WEBHOOK_URL)
+    logging.info(f"✅ Webhook set: {WEBHOOK_URL}")
 
-    await message.answer("Готово ✅")
+
+async def on_shutdown(app):
+    await bot.delete_webhook()
+    logging.info("❌ Webhook removed")
+
+
+async def handle_webhook(request):
+    update = types.Update(**await request.json())
+    await dp.feed_update(bot, update)
+    return web.Response()
 
 
 async def main():
-    logging.info("🤖 Bot polling started")
-    await dp.start_polling(bot)
+    app = web.Application()
+    app.router.add_post(WEBHOOK_PATH, handle_webhook)
+
+    app.on_startup.append(on_startup)
+    app.on_shutdown.append(on_shutdown)
+
+    runner = web.AppRunner(app)
+    await runner.setup()
+    site = web.TCPSite(runner, "0.0.0.0", PORT)
+    await site.start()
+
+    logging.info(f"🌐 Web server started on port {PORT}")
+
+    await asyncio.Event().wait()
 
 
 if __name__ == "__main__":
     asyncio.run(main())
-
-
-
 
