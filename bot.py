@@ -1,3 +1,4 @@
+# ==================== КОНФИГУРАЦИЯ ====================
 import os
 import logging
 from aiohttp import web
@@ -8,15 +9,17 @@ from aiogram.filters import CommandStart, Command
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton, BufferedInputFile
 from aiogram.webhook.aiohttp_server import SimpleRequestHandler, setup_application
 
-# ==================== КОНФИГУРАЦИЯ ====================
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# Токен бота (ОСТАВЬ СВОЙ)
-BOT_TOKEN = "8510415452:AAGeHIEFqF7ZZGBHWIrvDKCBfrONGuxc19E"
+# Токен бота (из переменных окружения Render)
+BOT_TOKEN = os.getenv("BOT_TOKEN")
+if not BOT_TOKEN:
+    logger.error("❌ BOT_TOKEN не найден в переменных окружения!")
+    exit(1)
 
-# Webhook URL (ОСТАВЬ СВОЙ)
-WEBHOOK_HOST = "https://bot-psychologist-1-utv7.onrender.com"
+# Webhook URL (замени на свой, если изменился)
+WEBHOOK_HOST = os.getenv("WEBHOOK_HOST", "https://bot-psychologist-1-utv7.onrender.com")
 WEBHOOK_PATH = f"/webhook/{BOT_TOKEN}"
 WEBHOOK_URL = f"{WEBHOOK_HOST}{WEBHOOK_PATH}"
 
@@ -180,3 +183,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+
