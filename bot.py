@@ -1,7 +1,7 @@
 import os
 import logging
-from pathlib import Path
 from aiohttp import web
+import aiohttp
 
 from aiogram import Bot, Dispatcher, types
 from aiogram.filters import CommandStart, Command
@@ -12,10 +12,10 @@ from aiogram.webhook.aiohttp_server import SimpleRequestHandler, setup_applicati
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# Токен бота
+# Токен бота (ОСТАВЬ СВОЙ)
 BOT_TOKEN = "8510415452:AAGeHIEFqF7ZZGBHWIrvDKCBfrONGuxc19E"
 
-# Webhook URL (Render автоматически дает домен)
+# Webhook URL (ОСТАВЬ СВОЙ)
 WEBHOOK_HOST = "https://bot-psychologist-1-utv7.onrender.com"
 WEBHOOK_PATH = f"/webhook/{BOT_TOKEN}"
 WEBHOOK_URL = f"{WEBHOOK_HOST}{WEBHOOK_PATH}"
@@ -27,33 +27,17 @@ bot = Bot(token=BOT_TOKEN)
 dp = Dispatcher()
 
 # ==================== ФАЙЛЫ ====================
-BASE_DIR = Path(__file__).parent
-FILES_DIR = BASE_DIR / "files"
-
-# Проверяем папку с файлами
-if not FILES_DIR.exists():
-    logger.warning(f"Папка files не найдена! Создаю...")
-    FILES_DIR.mkdir()
+# Файлы берутся ПРЯМО ИЗ ТВОЕГО GITHUB!
+GITHUB_BASE_URL = "https://github.com/olegkiroulev/psychologist/raw/main/"
 
 FILES = {
-    "anxiety": ("🧠 Тревожность", FILES_DIR / "anxiety.pdf"),
-    "burnout": ("🔥 Выгорание", FILES_DIR / "burnout.pdf"),
-    "growth": ("🌱 Личностный рост", FILES_DIR / "growth.pdf"),
-    "relations": ("💬 Отношения", FILES_DIR / "relations.pdf"),
-    "selfesteem": ("❤️ Самооценка", FILES_DIR / "selfesteem.pdf"),
-    "sleep": ("😴 Сон", FILES_DIR / "sleep.pdf"),
+    "anxiety": ("🧠 Тревожность", "anxiety.pdf"),
+    "burnout": ("🔥 Выгорание", "burnout.pdf"),
+    "growth": ("🌱 Личностный рост", "growth.pdf"),
+    "relations": ("💬 Отношения", "relations.pdf"),
+    "selfesteem": ("❤️ Самооценка", "selfesteem.pdf"),
+    "sleep": ("😴 Сон", "sleep.pdf"),
 }
-
-# Логируем файлы
-logger.info("=" * 50)
-logger.info("ПРОВЕРКА ФАЙЛОВ:")
-for key, (title, path) in FILES.items():
-    if path.exists():
-        size_kb = path.stat().st_size / 1024
-        logger.info(f"✅ {title:20} - {size_kb:.1f} КБ")
-    else:
-        logger.error(f"❌ {title:20} - НЕ НАЙДЕН: {path}")
-logger.info("=" * 50)
 
 # ==================== КЛАВИАТУРА ====================
 def get_keyboard():
@@ -97,29 +81,26 @@ async def process_file(callback: types.CallbackQuery):
         await callback.answer("❌ Ошибка: файл не найден", show_alert=True)
         return
     
-    title, path = FILES[key]
+    title, filename = FILES[key]
     logger.info(f"📤 Запрос файла: {title} от {callback.from_user.id}")
-    
-    if not path.exists():
-        await callback.answer("❌ Файл временно недоступен", show_alert=True)
-        return
     
     try:
         # Уведомляем пользователя
         await callback.answer(f"📤 Отправляю {title}...")
         
-        # Читаем файл
-        with open(path, 'rb') as f:
-            file_data = f.read()
+        # Скачиваем файл из GitHub
+        file_url = GITHUB_BASE_URL + filename
+        logger.info(f"🌐 Скачиваю: {file_url}")
         
-        # Проверяем размер
-        file_size = len(file_data)
-        if file_size > 50 * 1024 * 1024:  # 50 MB лимит Telegram
-            await callback.message.answer(f"⚠️ Файл слишком большой ({file_size//(1024*1024)} МБ)")
-            return
+        async with aiohttp.ClientSession() as session:
+            async with session.get(file_url) as response:
+                if response.status != 200:
+                    raise Exception(f"Ошибка скачивания: {response.status}")
+                
+                file_data = await response.read()
         
         # Отправляем
-        document = BufferedInputFile(file=file_data, filename=path.name)
+        document = BufferedInputFile(file=file_data, filename=filename)
         await callback.message.answer_document(
             document=document,
             caption=f"📄 {title}"
@@ -186,7 +167,7 @@ def main():
     logger.info("=" * 50)
     logger.info(f"🚀 ЗАПУСК БОТА НА ПОРТУ: {PORT}")
     logger.info(f"🌐 WEBHOOK URL: {WEBHOOK_URL}")
-    logger.info(f"📁 РАБОЧАЯ ДИРЕКТОРИЯ: {BASE_DIR}")
+    logger.info("📁 ФАЙЛЫ БЕРУТСЯ ИЗ GITHUB")
     logger.info("=" * 50)
     
     # Запускаем сервер
@@ -199,4 +180,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
