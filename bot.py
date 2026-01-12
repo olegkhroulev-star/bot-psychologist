@@ -29,7 +29,7 @@ bot = Bot(token=BOT_TOKEN)
 dp = Dispatcher()
 
 # ==================== ФАЙЛЫ ====================
-GITHUB_BASE_URL = "https://github.com/olegkiroulev/psychologist/raw/main/"
+GITHUB_BASE_URL = "https://raw.githubusercontent.com/olegkhroulev-star/bot-psychologist/main/files/"
 
 FILES = {
     "anxiety": ("🧠 Тревожность", "anxiety.pdf"),
@@ -119,4 +119,5 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 
