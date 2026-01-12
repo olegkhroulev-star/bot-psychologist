@@ -1,20 +1,20 @@
 import os
 import logging
-import aiohttp
 from aiohttp import web
 
 from aiogram import Bot, Dispatcher, types
 from aiogram.filters import CommandStart
-from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton, BufferedInputFile
+from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 from aiogram.webhook.aiohttp_server import SimpleRequestHandler, setup_application
 
-# ==================== НАСТРОЙКИ ====================
+# ==================== ЛОГИ ====================
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+# ==================== ENV ====================
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 if not BOT_TOKEN:
-    raise RuntimeError("BOT_TOKEN not set")
+    raise RuntimeError("❌ BOT_TOKEN not set")
 
 WEBHOOK_HOST = os.getenv(
     "WEBHOOK_HOST",
@@ -25,11 +25,15 @@ WEBHOOK_URL = f"{WEBHOOK_HOST}{WEBHOOK_PATH}"
 
 PORT = int(os.getenv("PORT", 10000))
 
+# ==================== AIROGRAM ====================
 bot = Bot(token=BOT_TOKEN)
 dp = Dispatcher()
 
-# ==================== ФАЙЛЫ ====================
-GITHUB_BASE_URL = "https://raw.githubusercontent.com/olegkhroulev-star/bot-psychologist/main/files/"
+# ==================== ФАЙЛЫ (GitHub RAW) ====================
+GITHUB_BASE_URL = (
+    "https://raw.githubusercontent.com/"
+    "olegkhroulev-star/bot-psychologist/main/files/"
+)
 
 FILES = {
     "anxiety": ("🧠 Тревожность", "anxiety.pdf"),
@@ -49,7 +53,7 @@ def keyboard():
         ]
     )
 
-# ==================== ОБРАБОТЧИКИ ====================
+# ==================== HANDLERS ====================
 @dp.message(CommandStart())
 async def start(message: types.Message):
     logger.info(f"/start from {message.from_user.id}")
@@ -63,37 +67,32 @@ async def send_file(callback: types.CallbackQuery):
     key = callback.data.split(":")[1]
 
     if key not in FILES:
-        await callback.answer("Файл не найден", show_alert=True)
+        await callback.answer("❌ Файл не найден", show_alert=True)
         return
 
     title, filename = FILES[key]
-    url = GITHUB_BASE_URL + filename
+    file_url = GITHUB_BASE_URL + filename
 
-    await callback.answer(f"Отправляю {title}…")
+    logger.info(f"📤 Sending {file_url}")
+
+    await callback.answer(f"📄 Отправляю {title}…")
 
     try:
-        async with aiohttp.ClientSession() as session:
-            async with session.get(url) as resp:
-                if resp.status != 200:
-                    raise RuntimeError(f"Download error {resp.status}")
-                data = await resp.read()
-
-        document = BufferedInputFile(data, filename=filename)
-        await callback.message.answer_document(
-            document=document,
+        await bot.send_document(
+            chat_id=callback.message.chat.id,
+            document=file_url,
             caption=title
         )
-
-        logger.info(f"Sent {filename}")
+        logger.info(f"✅ Sent {filename}")
 
     except Exception as e:
-        logger.error(f"File send error: {e}")
+        logger.error(f"❌ Telegram error: {e}")
         await callback.answer("Ошибка при отправке", show_alert=True)
 
 # ==================== WEBHOOK ====================
 async def on_startup(bot: Bot):
     await bot.set_webhook(WEBHOOK_URL)
-    logger.info(f"Webhook set: {WEBHOOK_URL}")
+    logger.info(f"✅ Webhook set: {WEBHOOK_URL}")
 
 # ==================== APP ====================
 def main():
@@ -114,10 +113,11 @@ def main():
 
     setup_application(app, dp, bot=bot)
 
-    logger.info("Bot started")
+    logger.info("🚀 Bot started")
     web.run_app(app, host="0.0.0.0", port=PORT)
 
 if __name__ == "__main__":
     main()
+
 
 
